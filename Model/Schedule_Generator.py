@@ -11,7 +11,9 @@ from Node import Node
 
 
 
-def apply_constraint(model:cp_model.CpModel, variable, operation:str, value:int, enforcer):
+def apply_constraint(model:cp_model.CpModel, variable, operation:str, value:int, enforcer): 
+    #Helper function for applying custom constraints
+    """Applies a constraint to a variable based on the specified operation and value, only if the enforcer variable is true."""
     match operation:
         case ">":
             model.add(variable > value).OnlyEnforceIf(enforcer)
@@ -27,6 +29,8 @@ def apply_constraint(model:cp_model.CpModel, variable, operation:str, value:int,
             model.add(variable != value).OnlyEnforceIf(enforcer)
 
 def find_relevant(taken_classes, All_Classes):
+    #Helper function to optimize the solver by only including classes that are relevant to the taken_classes based on their prerequisites
+    """Finds all classes that are relevant to the taken_classes based on their prerequisites. This includes the taken_classes themselves, their prerequisites, the prerequisites of their prerequisites, and so on."""
     ok_list = []
     def investigate(code):
         token_pattern = re.compile(r"""
@@ -52,6 +56,7 @@ def find_relevant(taken_classes, All_Classes):
 
 
 class DCPSolver:
+    #Class that initializes the solver and contains all of the functions for adding constraints and solving the problem
     def __init__(self,completed_credits: list,dcp_list: list,additional_completions: list):
         self.model = cp_model.CpModel()
         self.completed_credits = completed_credits
@@ -60,17 +65,20 @@ class DCPSolver:
         self.additional_completions = additional_completions
 
     def InitializeClasses(self, Unique_Courses_df: pd.DataFrame):
+        """Initializes the All_Classes dictionary with Class objects for"""
         self.All_Classes = {}
         for _, c in Unique_Courses_df.iterrows():
             self.All_Classes[c['Code']] = Class(code = c['Code'], title = c['Title'],credits=c['Credits'],residential_prereqs=c['ResidentPrerequisites'],online_prereqs=c['OnlinePrerequisites'],offerings=c['Offered'],additional=c['RegistrationRestrictions'], model = self.model, semester_domain = self.semester_domain)
       
     def AddMeetingTimes(self,meeting_times_df: pd.DataFrame):
+        """Adds meeting times to the options for each class based on the meeting_times_df dataframe."""
         for code in find_relevant(self.dcp_list, self.All_Classes):
             class_ = self.All_Classes[code]
             course_meeting_time_df = meeting_times_df[meeting_times_df['Course Code'].str.rstrip() == class_.code]
             class_.add_meeting_times(class_offerings_df = course_meeting_time_df)   
 
     def AddPrereqs(self):
+        """Adds prerequisite constraints for each class based on the prerequisites specified in the Unique_Courses_df dataframe."""
         self.other_prereqs = []
         self.Semesters_Taken = {c.code: [c.semester_taken,c.is_present,c.prereq_enforced, c.transferred] for c in self.All_Classes.values()}
         for code in find_relevant(self.dcp_list, self.All_Classes):
@@ -80,6 +88,7 @@ class DCPSolver:
                     self.other_prereqs.append(string)
         
     def AddNoOverlaps(self):
+        """Enforces no-overlap constraints for all of the residential class options based on their meeting times."""
         self.Days_Intervals = []
         for class_ in self.All_Classes.values():
             for option in class_.options:
@@ -93,6 +102,7 @@ class DCPSolver:
             self.model.add_no_overlap_2d(day_intervals_list,semester_list)
     
     def AddCreditCap(self,max_credits = 18):
+        """Enforces a credit cap for each semester based on the max_credits parameter, which is set to 18 by default."""
         for semester in range(1,9):
             credit_sum = []
             for code in find_relevant(self.dcp_list,self.All_Classes):
@@ -108,6 +118,7 @@ class DCPSolver:
                 credit_sum.append(class_.credits_apply*class_.credits)
             self.model.add(sum(credit_sum) <= max_credits)
     def Add_Required_Completed_Classes(self):
+        """Enforces that all classes in the dcp_list are completed, and that all classes not in the dcp_list or completed_credits are not completed."""
         for c in self.All_Classes.values():
             if c.code in self.dcp_list:
                 print(f'adding {c.code}')
@@ -122,6 +133,7 @@ class DCPSolver:
                 self.model.add(c.transferred == False)
 
     def AddCustomConstraints(self, custom_constraints_df: pd.DataFrame):
+        """Adds custom constraints based on the custom_constraints_df dataframe"""
         for _, constraint in custom_constraints_df.iterrows():
             for code in constraint['Affecting']:
                 class_ = self.All_Classes[code]
@@ -134,6 +146,7 @@ class DCPSolver:
                                 apply_constraint(self.model,day.start,constraint['Operation'],constraint['Value'],day.taken)
 
     def Solve(self):
+        """Solves the model and prints the solution in a readable format."""
         self.solver = cp_model.CpSolver()
         status = self.solver.Solve(self.model)
         print(f"Solver status: {self.solver.StatusName(status)}")
@@ -177,6 +190,7 @@ class DCPSolver:
             self.solved_df = pd.DataFrame(solved_list).sort_values(by=['Code','Semester'])
 
     def DisplaySolution(self):
+        """Prints the solution in a readable format, showing the classes taken each semester along with their meeting times if they are residential."""
         present_classes = [c for c in self.All_Classes.values() if self.solver.Value(c.is_present) == True]
 
         day_dict = {
@@ -204,7 +218,9 @@ class DCPSolver:
         print(self.solved_df.head(20))
 
 if __name__ == '__main__':
+    #Example of how to use the DCPSolver class with some sample data. In practice, the completed_credits, dcp_list, additional_completions, max_credits, and custom_constraints_df variables would be populated based on user input or other sources of data.
 
+    
     completed_credits = ['MATH 128'] #classes that have already been completed
     dcp_list = ['MATH 431'] #classes that need to be completed
     additional_completions = [] #additional completions related to the prerequisites for each class
