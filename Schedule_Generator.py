@@ -528,8 +528,8 @@ if __name__ == '__main__':
     #can have operations <,>,<=,>=,==,!= with types "Semester Taken" and "Start Time". Semester Taken has freshman fall as "1", freshman spring as "2", etc
 
     #various backend dfs that should be static for each user
-    Unique_Courses_df = pd.read_csv('All_Courses.csv') #related to the prerequisites and information of the particular courses
-    meeting_times_df = pd.read_csv('cleaned.csv') #df of all of the offerings from a number of different semesters
+    Unique_Courses_df = pd.read_csv('Course_Data.csv') #related to the prerequisites and information of the particular courses
+    meeting_times_df = pd.read_csv('Offerings.csv') #df of all of the offerings from a number of different semesters
 
     solver = DCPSolver(completed_credits,dcp_list,additional_completions)
     solver.InitializeClasses(Unique_Courses_df)
