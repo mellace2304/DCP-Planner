@@ -149,6 +149,7 @@ class Class:
             return cleaned_tokens
 
         def build_ast(tokens):
+            #to do: use a tree from treelib to improve performance and readability
             stack = []
             for token in tokens:
                 if token in ['and', 'or']:
